@@ -1,0 +1,131 @@
+Smart Contract — Decentralized Lottery 🎰
+contracts/Lottery.sol
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Lottery {
+    address public manager;
+    address[] public players;
+
+    constructor() {
+        manager = msg.sender;
+    }
+
+    function enter() public payable {
+        require(msg.value > 0.01 ether, "Minimum 0.01 ETH to join");
+        players.push(msg.sender);
+    }
+
+    function random() private view returns (uint256) {
+        // ⚠️ simple randomness (for demo only)
+        return uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, players)));
+    }
+
+    function pickWinner() public restricted {
+        uint256 index = random() % players.length;
+        address winner = players[index];
+        payable(winner).transfer(address(this).balance);
+
+        // reset lottery
+        players = new address ;
+    }
+
+    modifier restricted() {
+        require(msg.sender == manager, "Only manager can call this");
+        _;
+    }
+
+    function getPlayers() public view returns (address[] memory) {
+        return players;
+    }
+}
+
+scripts/deploy.js
+const hre = require("hardhat");
+
+async function main() {
+  const Lottery = await hre.ethers.getContractFactory("Lottery");
+  const lottery = await Lottery.deploy();
+  await lottery.deployed();
+  console.log("Lottery deployed to:", lottery.address);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+
+test/test_lottery.js
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("Lottery", function () {
+  it("Should allow players to enter and pick a winner", async function () {
+    const [manager, player1, player2] = await ethers.getSigners();
+
+    const Lottery = await ethers.getContractFactory("Lottery");
+    const lottery = await Lottery.deploy();
+    await lottery.deployed();
+
+    await lottery.connect(player1).enter({ value: ethers.utils.parseEther("0.02") });
+    await lottery.connect(player2).enter({ value: ethers.utils.parseEther("0.03") });
+
+    expect((await lottery.getPlayers()).length).to.equal(2);
+
+    await lottery.connect(manager).pickWinner();
+    expect((await lottery.getPlayers()).length).to.equal(0);
+  });
+});
+
+README.md
+# 🎰 Decentralized Lottery
+
+A simple decentralized lottery contract built with Solidity and Hardhat.
+
+---
+
+## 🛠️ Tech Stack
+- Solidity 0.8
+- Hardhat
+- Ethers.js
+- Chai for testing
+
+---
+
+## 🚀 Run Locally
+1. Clone repo:
+```bash
+git clone https://github.com/YOUR_USERNAME/lottery-dapp.git
+cd lottery-dapp
+
+
+Install dependencies:
+
+npm install
+
+
+Compile:
+
+npx hardhat compile
+
+
+Run tests:
+
+npx hardhat test
+
+
+Deploy:
+
+npx hardhat run scripts/deploy.js --network localhost
+
+📌 Features
+
+Anyone can join by sending at least 0.01 ETH
+
+Random winner is selected
+
+Entire pool is transferred to the winner
+
+Manager controls winner selection
+
+⚠️ Note: Randomness here is only for demo (not secure in production). In real-world apps, use Chainlink VRF
